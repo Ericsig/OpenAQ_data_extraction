@@ -16,6 +16,11 @@ no2_µg/m³.
 The API provides information about the average and the last value measured of each parameter
 In the next iterations, the idea is to extract each of those parameters and write them in the
 final table inside Redshift
+For the time being, this code generates a json with the following data:
+'id', 'city', 'name', 'entity', 'country', 'sources', 'isMobile',
+'isAnalysis', 'parameters', 'sensorType', 'lastUpdated', 'firstUpdated',
+'measurements', 'bounds', 'manufacturers', 'coordinates.latitude',
+'coordinates.longitude'. 
 
 '''
 
