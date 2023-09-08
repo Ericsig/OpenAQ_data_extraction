@@ -34,7 +34,7 @@ import os
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-
+from transform_openaq_data import TransformData
 class DataETL:
     def __init__(self, api_url, headers, redshift_config):
         self.api_url = api_url
@@ -93,7 +93,7 @@ def main():
 
     etl = DataETL(api_url, headers, redshift_config)
     etl.extract_data()
-    print(etl.api_data)
+    open_aq_df = TransformData(json_data=etl.api_data)
 
 if __name__ == "__main__":
     main()
