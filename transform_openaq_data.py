@@ -38,20 +38,25 @@ class TransformData:
                data_list.append(location_data)
          # Create a Pandas DataFrame from the list of location data
         self.open_aq_df = pd.DataFrame(data_list)
+    
     #Function to remove duplicates and NaNs
-
     def clean_dataframe(self):
         self.open_aq_df.drop_duplicates(subset='id', inplace=True)
         self.open_aq_df.dropna(axis=0, subset=['id', 'city', 'name', 'parameters'], inplace=True)
+    
+    #Function to transform "parameters", "bounds" and "manufacturers" columns to string
+    def convert_column_to_string(self):
+        self.open_aq_df['parameters'] = self.open_aq_df['parameters'].apply(json.dumps)
+        self.open_aq_df['manufacturers'] = self.open_aq_df['manufacturers'].apply(json.dumps)
+        self.open_aq_df['bounds'] = self.open_aq_df['bounds'].astype(str)
+
 
 
 def main(json_data):
     df_transform = TransformData(json_data)
     df_transform.transform_json_to_df()
     df_transform.clean_dataframe()
-
-    # Print or return the cleaned DataFrame
-    print(df_transform.open_aq_df)
+    df_transform.convert_column_to_string()
 
 if __name__ == "__main__":
     main()   

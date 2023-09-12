@@ -30,7 +30,6 @@ For the time being, this code generates a json with the following data:
 import requests
 import json
 import os
-import psycopg2
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -88,18 +87,22 @@ class DataETL:
             transformer = TransformData(self.api_data)
             transformer.transform_json_to_df()
             transformer.clean_dataframe()
+            transformer.convert_column_to_string()
             self.transformed_data = transformer.open_aq_df
     
 
     ### Function to load data to redshift database
     def load_data_to_redshift(self):
-        loader = RedshiftDataLoader(self.transformed_data)
+        db_user = os.environ.get('redshift_db_user')
+        db_pass = os.environ.get('redshift_db_pass')
+        db_host = 'data-engineer-cluster.cyhh5bfevlmn.us-east-1.redshift.amazonaws.com'
+        loader = RedshiftDataLoader(db_pass=db_pass, db_host=db_host, db_user=db_user)
         try:
             loader.connect_to_database()
         except Exception as e:
             print('Failed to connect to DB', e)
         try:
-            loader.load_data_to_database()
+            loader.load_data_to_database(self.transformed_data)
         except Exception as e:
             print('Failed to load data to DB', e)
         
@@ -114,8 +117,6 @@ def main():
     etl.extract_data()
     etl.transform_data()
     etl.load_data_to_redshift()
-
-    print(etl.transformed_data)
 
 if __name__ == "__main__":
     main()
