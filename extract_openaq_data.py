@@ -25,23 +25,27 @@ For the time being, this code generates a json with the following data:
 '''
 
 
-###
-
+###Imports
+#Import libraries
 import requests
 import json
 import os
-#
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+#Custom imports
+from transform_openaq_data import TransformData
+from load_to_redshift import RedshiftDataLoader
 
+#ETL Class
 class DataETL:
-    def __init__(self, api_url, headers, redshift_config):
+    def __init__(self, api_url, headers):
         self.api_url = api_url
         self.headers = headers
-        self.redshift_config = redshift_config
         self.api_data = None
-
+   
+   
+    # Function to extract data from OpenAQ API
     def extract_data(self):
         '''
         The OpenAQ provides data about air quality in different locations.
@@ -76,6 +80,32 @@ class DataETL:
             data = response.json()
             data_by_country[country_code]=data['results']
         self.api_data = json.dumps(data_by_country, indent=4)
+        
+        
+    def transform_data(self):    
+        if self.api_data is not None:
+            transformer = TransformData(self.api_data)
+            transformer.transform_json_to_df()
+            transformer.clean_dataframe()
+            transformer.convert_column_to_string()
+            self.transformed_data = transformer.open_aq_df
+    
+
+    ### Function to load data to redshift database
+    def load_data_to_redshift(self):
+        db_user = os.environ.get('redshift_db_user')
+        db_pass = os.environ.get('redshift_db_pass')
+        db_host = 'data-engineer-cluster.cyhh5bfevlmn.us-east-1.redshift.amazonaws.com'
+        loader = RedshiftDataLoader(db_pass=db_pass, db_host=db_host, db_user=db_user)
+        try:
+            loader.connect_to_database()
+        except Exception as e:
+            print('Failed to connect to DB', e)
+        try:
+            loader.load_data_to_database(self.transformed_data)
+        except Exception as e:
+            print('Failed to load data to DB', e)
+        
 
 
 def main():
@@ -83,17 +113,10 @@ def main():
     
     headers = {"Accept": "application/json", "X-API-Key": os.environ.get('apikey_openaq')}
 
-    redshift_config = {
-        'dbname': 'data-engineer-database',
-        'host': 'data-engineer-cluster.cyhh5bfevlmn.us-east-1.redshift.amazonaws.com',
-        'port': '5439',
-        'user': os.environ.get('redshift_db_user'),
-        'password': os.environ.get('redshift_db_pass')
-    }
-
-    etl = DataETL(api_url, headers, redshift_config)
+    etl = DataETL(api_url, headers)
     etl.extract_data()
-    print(etl.api_data)
+    etl.transform_data()
+    etl.load_data_to_redshift()
 
 if __name__ == "__main__":
     main()
