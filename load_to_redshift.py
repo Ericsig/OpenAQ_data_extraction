@@ -1,6 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine, exc, types
 import os
+from datetime import date
 
 class RedshiftDataLoader:
     def __init__(self, db_user, db_pass, db_host):
@@ -21,16 +22,26 @@ class RedshiftDataLoader:
             print('Connection failed with error', e)
         return engine
 
+    def check_last_updated(self):
+        date_df = pd.read_sql_query('SELECT lastUpdated FROM ericsig_coderhouse.open_aq_data', con=self.engine)
+        date_df['lastupdated'] = pd.to_datetime(date_df['lastupdated'])
+        return date_df
+
     def load_data_to_database(self, openaq_df, table_name='open_aq_data'):
-        try:
-            openaq_df.to_sql(table_name, 
-                             self.engine, 
-                             if_exists='replace', 
-                             index=False, 
-                             dtype={'parameters': types.VARCHAR(length=65535)})
-            print('Data successfully loaded')
-        except exc.SQLAlchemyError as e:
-            print('SQLAlchemy Exception: ', e)
+        date_df = self.check_last_updated()
+        if date_df['lastupdated'].max() == pd.Timestamp(date.today()):
+            print('Data has been already loaded today')
+            exit()
+        else:    
+            try:
+                openaq_df.to_sql(table_name, 
+                                self.engine, 
+                                if_exists='append', 
+                                index=False, 
+                                dtype={'parameters': types.VARCHAR(length=65535)})
+                print('Data successfully loaded')
+            except exc.SQLAlchemyError as e:
+                print('SQLAlchemy Exception: ', e)
         
 
 def main(openaq_df):
