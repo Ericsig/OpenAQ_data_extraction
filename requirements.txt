@@ -1,0 +1,8 @@
+# Requirements for the project.
+
+requests
+pandas
+psycopg2-binary
+sqlalchemy
+urllib3
+datetime
