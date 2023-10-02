@@ -56,17 +56,36 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
-    
+    redshift_db_user: ${redshift_db_user}
+    redshift_db_pass: ${redshift_db_pass}
+    apikey_openaq: ${apikey_openaq}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-50000}"
+
   depends_on:
     postgres:
       condition: service_healthy
 
 services:
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
 
   airflow-webserver:
     <<: *airflow-common
@@ -79,21 +98,16 @@ services:
       timeout: 10s
       retries: 5
     restart: always
+  
   etl:
     build:
-      context: C:\Users\erics\OneDrive\Documents\coderhouse_exercises\
+      context: C:\Users\erics\OneDrive\Documents\coderhouse_exercises\OpenAQ_etl\
       dockerfile: Dockerfile
-    depends_on:
-      - redshift
     environment:
-      - redshift_db_user = /run/secrets/redshift_user
-      - redshift_db_pass = /run/secrets/redshift_pass
-      - apikey_openaq = /run/secrets/apikey_openaq
-    secrets:
-      - redshift_user
-      - redshift_pass
-      - apikey_openaq
-
+      - redshift_db_user=${redshift_db_user}
+      - redshift_db_pass=${redshift_db_pass}
+      - apikey_openaq=${apikey_openaq}
+    
 
   airflow-scheduler:
     <<: *airflow-common
@@ -110,14 +124,6 @@ services:
       _AIRFLOW_WWW_USER_CREATE: 'true'
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-
-secrets:
-   redshift_user:
-     file: docker/airflow_docker/redshift_user.txt
-   redshift_pass:
-     file: docker/airflow_docker/redshift_pass.txt
-   apikey_openaq:
-     file: docker/airflow_docker/apikey_openaq.txt
 
    
 

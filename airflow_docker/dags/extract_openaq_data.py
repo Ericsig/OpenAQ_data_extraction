@@ -39,10 +39,11 @@ from load_to_redshift import RedshiftDataLoader
 
 #ETL Class
 class DataETL:
-    def __init__(self, api_url, headers):
+    def __init__(self, api_url, headers, db_user, db_pass):
         self.api_url = api_url
         self.headers = headers
-        self.api_data = None
+        self.db_user = db_user
+        self.db_pass = db_pass
    
    
     # Function to extract data from OpenAQ API
@@ -82,19 +83,19 @@ class DataETL:
         self.api_data = json.dumps(data_by_country, indent=4)
         
         
-    def transform_data(self):    
+    def transform_data(self):  
         if self.api_data is not None:
             transformer = TransformData(self.api_data)
             transformer.transform_json_to_df()
             transformer.clean_dataframe()
             transformer.convert_column_to_string()
-            self.transformed_data = transformer.open_aq_df
+            self.transformed_data = transformer.open_aq_df           
     
 
     ### Function to load data to redshift database
     def load_data_to_redshift(self):
-        db_user = os.environ.get('redshift_db_user')
-        db_pass = os.environ.get('redshift_db_pass')
+        db_user = self.db_user
+        db_pass = self.db_pass
         db_host = 'data-engineer-cluster.cyhh5bfevlmn.us-east-1.redshift.amazonaws.com'
         loader = RedshiftDataLoader(db_pass=db_pass, db_host=db_host, db_user=db_user)
         try:
@@ -107,13 +108,14 @@ class DataETL:
             print('Failed to load data to DB', e)
         
 
-
 def main():
     api_url = "https://api.openaq.org/v2/countries?limit=200&offset=0&sort=asc"
     
     headers = {"Accept": "application/json", "X-API-Key": os.environ.get('apikey_openaq')}
+    db_user = os.environ.get('redshift_db_user')
+    db_pass = os.environ.get('redshift_db_pass')
 
-    etl = DataETL(api_url, headers)
+    etl = DataETL(api_url, headers, db_user, db_pass)
     etl.extract_data()
     etl.transform_data()
     etl.load_data_to_redshift()
