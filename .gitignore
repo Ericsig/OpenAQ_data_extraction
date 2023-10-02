@@ -1,8 +1,10 @@
 # Redshift and Open AQ credentials
 
-docker/airflow_docker/redshift_*
-docker/airflow_docker/apikey_openaq.txt
+redshift_*
+apikey_openaq.txt
 
 # Logs and databases #
 ######################
 *.log
+# Env
+*.env

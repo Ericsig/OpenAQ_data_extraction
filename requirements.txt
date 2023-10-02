@@ -1,8 +1,11 @@
 # Requirements for the project.
 
+apache-airflow==2.7.1
 requests
 pandas
 psycopg2-binary
 sqlalchemy
 urllib3
 datetime
+sqlalchemy-redshift
+
