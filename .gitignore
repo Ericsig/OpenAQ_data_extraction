@@ -1,10 +1,9 @@
-# Redshift and Open AQ credentials
 
-redshift_*
-apikey_openaq.txt
 
 # Logs and databases #
 ######################
 *.log
 # Env
 *.env
+#Variables
+*variables.json
