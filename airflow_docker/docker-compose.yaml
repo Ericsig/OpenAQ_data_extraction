@@ -56,9 +56,6 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
-    redshift_db_user: ${redshift_db_user}
-    redshift_db_pass: ${redshift_db_pass}
-    apikey_openaq: ${apikey_openaq}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -78,7 +75,7 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
+      - postgres-db-volume:/var/lib/postgresql/airflow_data
     ports:
       - 5432:5432
     healthcheck:
@@ -101,12 +98,8 @@ services:
   
   etl:
     build:
-      context: C:\Users\erics\OneDrive\Documents\coderhouse_exercises\OpenAQ_etl\
+      context: /home/eric/Documents/OpenAQ_data_extraction/
       dockerfile: Dockerfile
-    environment:
-      - redshift_db_user=${redshift_db_user}
-      - redshift_db_pass=${redshift_db_pass}
-      - apikey_openaq=${apikey_openaq}
     
 
   airflow-scheduler:

@@ -34,16 +34,27 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 #Custom imports
-from transform_openaq_data import TransformData
-from load_to_redshift import RedshiftDataLoader
+from coderhouse.etl_modules.connect_openaq_api import CountryListExtraction
+from coderhouse.etl_modules.transform_openaq_data import TransformData
+from coderhouse.etl_modules.load_to_redshift import RedshiftDataLoader
 
 #ETL Class
 class DataETL:
-    def __init__(self, api_url, headers, db_user, db_pass):
+    def __init__(self, api_url, headers, db_user, db_pass, db_host,
+                country_list, 
+                low_threshold, 
+                high_threshold,
+                filter_parameter):
         self.api_url = api_url
         self.headers = headers
         self.db_user = db_user
         self.db_pass = db_pass
+        self.db_host = db_host
+        self.country_list = country_list
+        #The following parameters are necessary to filter and alert if a value of the given parameter goes beyond the thresholds
+        self.low_threshold = low_threshold
+        self.high_threshold = high_threshold
+        self.parameter = filter_parameter
    
    
     # Function to extract data from OpenAQ API
@@ -54,22 +65,8 @@ class DataETL:
         The first API request retrieves the country data. Then, 
         the country code is used for the second API request, which brings the locations-level data.
         '''
-        retries = Retry(total=5, backoff_factor=0.3, status_forcelist=[ 500, 502, 503, 504, 408])
-        http_adapter = HTTPAdapter(max_retries=retries)
-        session = requests.Session()
-        session.mount("http://", http_adapter)
-        session.mount("https://", http_adapter)
-        try:
-            response = session.get(self.api_url, headers=self.headers, timeout=30)
-            response.raise_for_status()
-            api_data = response.json()
-        except requests.exceptions.RequestException as e:
-            print("API request failed:", e)
-            exit()
-        
-        data_by_country={}
-        for i in api_data['results']:
-            country_code = i['code']
+        data_by_country = {}
+        for country_code in self.country_list:
             print(f'Extracting data for {country_code}')
             try:
                 url2 = f"https://api.openaq.org/v2/locations?country={country_code}"
@@ -81,22 +78,21 @@ class DataETL:
             data = response.json()
             data_by_country[country_code]=data['results']
         self.api_data = json.dumps(data_by_country, indent=4)
-        
-        
+
     def transform_data(self):  
         if self.api_data is not None:
             transformer = TransformData(self.api_data)
             transformer.transform_json_to_df()
             transformer.clean_dataframe()
+            transformer.check_parameters(self.low_threshold, self.high_threshold, self.parameter)
             transformer.convert_column_to_string()
-            self.transformed_data = transformer.open_aq_df           
+            self.anomalies = transformer.anomalies
+            self.transformed_data = transformer.open_aq_df
     
-
-    ### Function to load data to redshift database
-    def load_data_to_redshift(self):
+    def load_data(self):
         db_user = self.db_user
         db_pass = self.db_pass
-        db_host = 'data-engineer-cluster.cyhh5bfevlmn.us-east-1.redshift.amazonaws.com'
+        db_host = self.db_host
         loader = RedshiftDataLoader(db_pass=db_pass, db_host=db_host, db_user=db_user)
         try:
             loader.connect_to_database()
@@ -111,14 +107,17 @@ class DataETL:
 def main():
     api_url = "https://api.openaq.org/v2/countries?limit=200&offset=0&sort=asc"
     
-    headers = {"Accept": "application/json", "X-API-Key": os.environ.get('apikey_openaq')}
-    db_user = os.environ.get('redshift_db_user')
-    db_pass = os.environ.get('redshift_db_pass')
+    headers = {"Accept": "application/json", "X-API-Key": 'apikey_openaq'}
+    db_user = 'redshift_db_user'
+    db_pass = 'redshift_db_pass'
+    country_extraction = CountryListExtraction(api_url, headers)
+    country_list = country_extraction.extract_country_list()
 
-    etl = DataETL(api_url, headers, db_user, db_pass)
+    etl = DataETL(api_url, headers, db_user, db_pass, country_list)
     etl.extract_data()
     etl.transform_data()
-    etl.load_data_to_redshift()
+    etl.load_data()
+
 
 if __name__ == "__main__":
     main()

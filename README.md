@@ -8,11 +8,10 @@ This API provides data about air quality in at least 300k locations arround the 
 
 The data for each location is updated every day.
 
-The parameters that define air quality are: um005_particles/cm³, um100_particles/cm³, temperature_c, pm1_µg/m³, pressure_mb, um003_particles/cm³_avg, pm25_µg/m³, humidity_%_avg, um025_particles/cm³, pm10_µg/m³, pm10_µg/m³, um050_particles/cm³, temperature_f, um010_particles/cm³, no2_ppm, co_ppm, o3_ppm, so2_ppm, o3_µg/m³, voc_iaq, co_µg/m³, nox_µg/m³, no_µg/m³, so2_µg/m³, no2_µg/m³.
+The parameters that define air quality are: pm1_µg/m³, pm25_µg/m³, pm10_µg/m³, pm10_µg/m³, no2_ppm, co_ppm, o3_ppm, so2_ppm, o3_µg/m³, co_µg/m³, nox_µg/m³, no_µg/m³, so2_µg/m³, no2_µg/m³.
 
-The API provides information about the average and the last value measured of each parameter. In the next iterations, the idea is to extract each of those parameters and write them in the final table inside Redshift
 
-For the time being, this code generates a json with the following data: 'id', 'city', 'name', 'entity', 'country', 'sources', 'isMobile', 'isAnalysis', 'parameters', 'sensorType', 'lastUpdated', 'firstUpdated', 'measurements', 'bounds', 'manufacturers', 'coordinates.latitude', 'coordinates.longitude'.
+This code generates a DataFrame with the following data: 'id', 'city', 'name', 'entity', 'country', 'sources', 'isMobile', 'isAnalysis', 'parameters', 'sensorType', 'lastUpdated', 'firstUpdated', 'measurements', 'bounds', 'manufacturers', 'coordinates.latitude', 'coordinates.longitude'. The data is uploaded to Redshift
 
 The code runs in a Airflow DAG, and Airflow runs inside a Docker container.
   
@@ -22,18 +21,66 @@ The code runs in a Airflow DAG, and Airflow runs inside a Docker container.
 - Clone the repository
 
 - Start the terminal and go to the ./airflow-docker folder
-- Create a .env file with your Redshift credentials and your Open AQ API key.
+- Create a variables.json file with your Redshift credentials and your Open AQ API key, among other parameters (see below)
+- Modify the docker-compose.yml with the context directory for building the etl container (line 104). It should look into the root folder.
 
-- Start the project with `docker-compose --env-file=.env up --build`. Make sure that the Docker daemon is already running before shooting the command. It will install all the dependencies of the project from the requirements.txt file.
+- Start the project with `docker-compose up --build`. Make sure that the Docker daemon is already running before shooting the command. It will install all the dependencies of the project from the requirements.txt file.
 
 - Go to your localhost:8080/home in your browser and check the DAGs.
-- The DAG includes currently a single task: etl_pipeline. Run the task. It will extract, transform and load the Open AQ data to your Amazon Redshift DB.
-
-# Notes
-The original idea was to run the extract, transform and loading in separate tasks in the DAG, like this:
+- The DAG includes 4 tasks: 
 
 ```mermaid
-graph LR
-A[Extract] ---> B[Transform] ---> D((Load))
+graph TD;
+
+A[Connect to Open AQ API]-->C[ETL Open AQ data];
+B[Create Redshift Table]-->C[ETL Open AQ data];
+C[ETL Open AQ data]-->D[Send Alerts];
+
 ```
-But the communication between the tasks is only possible using XCom, and is not recommended to pass dataframes or a large amount of data between tasks [Link to Airflow documentation](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html).
+- Generate the following variables with their corresponding values using a variable.json file and importing it into Airflow (see model below)
+  
+  - "apikey_openaq"
+  - "redshift_db"
+  - "redshift_db_user"
+  - "redshift_host"
+  - "secret_redshift_db_pass"
+  - "smtp_password"
+  - "high_threshold"
+  - "low_threshold"
+  - "filter_parameter"
+- The parameters that can be selected are the following:
+  - pm25_µg/m³, 
+  - no2_ppm, 
+  - pm10_µg/m³, 
+  - co_ppm, 
+  - co_µg/m³, 
+  - nox_µg/m³, 
+  - no_µg/m³, 
+  - no2_µg/m³, 
+  - o3_µg/m³, 
+  - so2_µg/m³, 
+  - o3_ppm,
+  - pm1_µg/m³, 
+  - no_ppm, 
+  - so2_ppm, 
+  - nox_ppm, 
+  - bc_µg/m³
+- The high and low threshold must be selected according to the parameter. For more information, check the [Open AQ documentation](https://docs.openaq.org/docs/parameters)
+
+### Variables
+
+Use the following model to create your 'variables.json' file
+
+```json
+{
+    "apikey_openaq": "apikey_openaq",
+    "high_threshold": 100,
+    "low_threshold": 0,
+    "filter_parameter": "filter_parameter",
+    "redshift_db": "redshift_db",
+    "redshift_db_user": "redshift_db_user",
+    "redshift_host": "example-cluster.xdxswr5sda.us-east-1.redshift.amazonaws.com",
+    "secret_redshift_db_pass": "secret_redshift_db_pass",
+    "smtp_password": "smtp_password"
+}
+```

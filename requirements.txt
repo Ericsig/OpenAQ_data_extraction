@@ -8,4 +8,6 @@ sqlalchemy
 urllib3
 datetime
 sqlalchemy-redshift
+redshift_connector
+apache-airflow-providers-postgres
 
