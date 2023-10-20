@@ -84,3 +84,9 @@ Use the following model to create your 'variables.json' file
     "smtp_password": "smtp_password"
 }
 ```
+
+### Alert example
+
+The email includes the date, the location, the parameter selected and the measurement. It also includes the ID to allow easy querying in the DB
+
+![Alert email example](SMTP_alert_airflow.png)
